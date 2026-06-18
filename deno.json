@@ -1,0 +1,18 @@
+{
+	"name": "@gramio/dialogs",
+	"version": "0.1.0",
+	"exports": "./src/index.ts",
+	"publish": {
+		"include": [
+			"src",
+			"README.md",
+			"LICENSE"
+		]
+	},
+	"imports": {
+		"gramio": "npm:gramio@^0.11.0",
+		"@gramio/storage": "npm:@gramio/storage@^2.0.0",
+		"etiket": "npm:etiket@^0.11.0"
+	},
+	"nodeModulesDir": "auto"
+}

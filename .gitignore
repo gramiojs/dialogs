@@ -1,0 +1,31 @@
+node_modules
+dist
+*.log
+.env
+.env.*
+coverage
+deno.lock
+
+# VitePress build artifacts
+.vitepress/cache
+.vitepress/dist
+docs/.vitepress/cache
+docs/.vitepress/dist
+
+# Local agent / tooling state
+.omc/
+.serena/
+.claude/settings.local.json
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini

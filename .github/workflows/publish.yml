@@ -1,0 +1,85 @@
+name: Publish package
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_to_npm:
+        description: "Publish package to NPM"
+        required: false
+        type: boolean
+        default: true
+      publish_to_jsr:
+        description: "Publish package to JSR (verify deno.json imports first)"
+        required: false
+        type: boolean
+        default: false
+      npm_tag:
+        description: "NPM dist-tag (latest | beta | next | …)"
+        required: false
+        type: string
+        default: "latest"
+      github_release_prerelease:
+        description: "Mark GitHub release as prerelease"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write # create the GitHub Release
+  id-token: write # npm provenance
+
+jobs:
+  publish_package:
+    name: Publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so the changelog can diff from the last tag
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Node (npm publish auth)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: "https://registry.npmjs.org"
+
+      - id: changelog
+        name: Generate changelog
+        run: bun scripts/generate-changelog.ts
+
+      - name: Install modules
+        run: bun install --frozen-lockfile
+
+      - name: Verify (lint · typecheck · test · build)
+        run: bun run check
+
+      - name: Prepare JSR manifest
+        if: ${{ inputs.publish_to_jsr }}
+        run: bun scripts/release-jsr.ts
+
+      - name: Publish to JSR
+        if: ${{ inputs.publish_to_jsr }}
+        run: bunx jsr publish --allow-dirty --allow-slow-types
+
+      - name: Publish to NPM
+        if: ${{ inputs.publish_to_npm }}
+        run: npm publish --provenance --access public --tag ${{ inputs.npm_tag }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: v${{ steps.changelog.outputs.version }}
+          name: v${{ steps.changelog.outputs.version }}
+          body: ${{ steps.changelog.outputs.changelog }}
+          draft: false
+          prerelease: ${{ inputs.github_release_prerelease }}
+          generateReleaseNotes: true

@@ -1,0 +1,8 @@
+{
+	// Publish-gate type-check: only the shippable `src`. Test files import
+	// `bun:test`, whose ambient types don't resolve under a plain `tsc` run on
+	// CI (they're validated by `bun test` instead). The main tsconfig.json still
+	// type-checks tests + examples for local development.
+	"extends": "./tsconfig.json",
+	"include": ["src"]
+}
