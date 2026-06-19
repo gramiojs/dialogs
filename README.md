@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/@gramio/dialogs?logo=npm&style=flat&labelColor=000&color=3b82f6)](https://www.npmjs.com/package/@gramio/dialogs)
 [![npm downloads](https://img.shields.io/npm/dw/@gramio/dialogs?logo=npm&style=flat&labelColor=000&color=3b82f6)](https://www.npmjs.com/package/@gramio/dialogs)
-[![CI](https://github.com/gramiojs/dialogs/actions/workflows/ci.yml/badge.svg)](https://github.com/gramiojs/dialogs/actions/workflows/ci.yml)
+[![CI](https://github.com/gramiojs/dialogs/actions/workflows/publish.yml/badge.svg)](https://github.com/gramiojs/dialogs/actions/workflows/publish.yml)
 
 Declarative, stateful **dialogs** and reusable **widgets** for
 [GramIO](https://gramio.dev) — you describe a screen as a tree of widgets, and the
