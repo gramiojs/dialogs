@@ -54,9 +54,13 @@ export interface StartOptions {
 	startMode?: StartMode;
 }
 
-/** Telegram rejects empty message text → substitute an invisible char. */
-function emptyToPlaceholder(text: Stringable): Stringable {
-	return text === "" ? "⁣" : text;
+/**
+ * Telegram rejects empty message text → substitute an invisible char. Returns
+ * `string` for gramio's strict `text` params; a `FormattableString` passes
+ * through unchanged at runtime (gramio's format hook converts it).
+ */
+function emptyToPlaceholder(text: Stringable): string {
+	return (text === "" ? "⁣" : text) as string;
 }
 
 /**

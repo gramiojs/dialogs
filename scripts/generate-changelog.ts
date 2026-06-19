@@ -10,10 +10,15 @@ import { EOL } from "node:os";
  */
 function getLatestTag(): string {
 	try {
-		return execSync("git describe --abbrev=0 --tags").toString().trim();
-	} catch (e) {
+		// Silence git's "fatal: No names found" stderr — the no-tags case is expected.
+		return execSync("git describe --abbrev=0 --tags", {
+			stdio: ["pipe", "pipe", "ignore"],
+		})
+			.toString()
+			.trim();
+	} catch {
 		// No tags yet → diff from the repository's first commit.
-		console.warn(e);
+		console.warn("No git tags found; changelog spans from the first commit.");
 		return execSync("git rev-list --max-parents=0 HEAD").toString().trim();
 	}
 }
