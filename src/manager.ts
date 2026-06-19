@@ -617,7 +617,7 @@ export class DialogManager {
 			this.stack.lastMessageId = sent.message_id;
 			this.stack.hasMedia = true;
 		} else {
-			const sent = 		await this.ctx.bot.api.sendMessage({
+			const sent = await this.ctx.bot.api.sendMessage({
 				chat_id: chatId,
 				text: emptyToPlaceholder(text),
 				reply_markup: keyboard,
