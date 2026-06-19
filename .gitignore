@@ -15,6 +15,7 @@ docs/.vitepress/dist
 # Local agent / tooling state
 .omc/
 .serena/
+.headroom/
 .claude/settings.local.json
 
 # TypeScript incremental build info
