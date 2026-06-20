@@ -1,5 +1,7 @@
 import type { DialogManager } from "../manager.ts";
 import type {
+	AnyData,
+	DataDict,
 	Keyboard,
 	MaybePromise,
 	RawButton,
@@ -7,9 +9,9 @@ import type {
 	WhenCondition,
 } from "../types.ts";
 
-export function isHidden(
-	when: WhenCondition | undefined,
-	rc: RenderContext,
+export function isHidden<D extends AnyData = DataDict>(
+	when: WhenCondition<D> | undefined,
+	rc: RenderContext<D>,
 ): boolean {
 	if (when === undefined) return false;
 	return !(typeof when === "function" ? when(rc) : when);

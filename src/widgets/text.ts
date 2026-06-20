@@ -1,7 +1,9 @@
 import type {
+	AnyData,
 	DataDict,
 	MaybePromise,
 	RenderContext,
+	RenderData,
 	Stringable,
 	TextSource,
 	TextWidget,
@@ -17,7 +19,7 @@ export function Const(text: Stringable): TextWidget {
  * {@link TextWidget}) into a `TextWidget`. Lets every widget accept text the
  * concise way — `text: "Hello"` or `text: (d) => d.name` — without `Const`/`Format`.
  */
-export function asText<Data extends DataDict = DataDict>(
+export function asText<Data extends AnyData = DataDict>(
 	src: TextSource<Data>,
 ): TextWidget<Data> {
 	if (typeof src === "string") return { renderText: () => src };
@@ -34,8 +36,10 @@ export function asText<Data extends DataDict = DataDict>(
  *   when used in a `Window<Data>` or via `defineWindow<Data>().text(...)`.
  * - Pass a template string with `{key}` placeholders interpolated from `data`.
  */
-export function Format<Data extends DataDict = DataDict>(
-	template: string | ((data: Data, rc: RenderContext<Data>) => Stringable),
+export function Format<Data extends AnyData = DataDict>(
+	template:
+		| string
+		| ((data: RenderData<Data>, rc: RenderContext<Data>) => Stringable),
 ): TextWidget<Data> {
 	if (typeof template === "function")
 		return { renderText: (rc) => template(rc.data, rc) };
@@ -60,11 +64,14 @@ export function Format<Data extends DataDict = DataDict>(
  * text: T("menu.greeting", (d) => ({ name: d.user.name })),
  * ```
  */
-export function T<Data extends DataDict = DataDict>(
+export function T<Data extends AnyData = DataDict>(
 	key: string,
 	params?:
 		| Record<string, unknown>
-		| ((data: Data, rc: RenderContext<Data>) => Record<string, unknown>),
+		| ((
+				data: RenderData<Data>,
+				rc: RenderContext<Data>,
+		  ) => Record<string, unknown>),
 ): TextWidget<Data> {
 	return {
 		renderText: (rc) => {

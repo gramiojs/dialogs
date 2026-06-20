@@ -1,6 +1,7 @@
 import { type BuilderWindow, Dialog, type DialogConfig } from "./dialog.ts";
 import type { DialogManager } from "./manager.ts";
 import type {
+	AnyData,
 	CallbackCtx,
 	DataDict,
 	DialogEventCtx,
@@ -42,7 +43,7 @@ import type { WindowOptions } from "./window.ts";
 export type TypedDialog<
 	State extends string = string,
 	Params = unknown,
-	Data extends DataDict = DataDict,
+	Data extends AnyData = DataDict,
 > = Dialog<Params> & {
 	readonly __types?: { state: State; params: Params; data: Data };
 };
@@ -52,7 +53,7 @@ export type TypedDialog<
  * typed `dialogData` / `params`. `switchTo` only accepts states declared via
  * {@link DialogBuilder.states}; `dialogData` is typed as the dialog's `Data`.
  */
-export interface TypedNav<State extends string, Params, Data extends DataDict>
+export interface TypedNav<State extends string, Params, Data extends AnyData>
 	extends Omit<DialogNav<Params>, "switchTo" | "dialogData"> {
 	switchTo(
 		state: State,
@@ -64,19 +65,19 @@ export interface TypedNav<State extends string, Params, Data extends DataDict>
 export type TypedEventCtx<
 	State extends string,
 	Params,
-	Data extends DataDict,
+	Data extends AnyData,
 > = DialogUpdateCtx & TypedNav<State, Params, Data>;
 
 export type TypedClickCtx<
 	State extends string,
 	Params,
-	Data extends DataDict,
+	Data extends AnyData,
 > = CallbackCtx & TypedNav<State, Params, Data>;
 
 export type TypedInputCtx<
 	State extends string,
 	Params,
-	Data extends DataDict,
+	Data extends AnyData,
 > = MessageCtx & TypedNav<State, Params, Data>;
 
 /**
@@ -85,10 +86,10 @@ export type TypedInputCtx<
  * with the dialog's `State` / `Params` / `Data`.
  */
 export interface TypedWindowOptions<
-	WData extends DataDict,
+	WData extends AnyData,
 	State extends string,
 	Params,
-	Data extends DataDict,
+	Data extends AnyData,
 > {
 	text?: TextSource<NoInfer<WData>>;
 	keyboard?: Keyboard<NoInfer<WData>>;
@@ -106,7 +107,7 @@ export interface TypedWindowOptions<
 export interface TypedButtonOptions<
 	State extends string,
 	Params,
-	Data extends DataDict,
+	Data extends AnyData,
 > extends ButtonChrome {
 	id: string;
 	onClick?: (ctx: TypedClickCtx<State, Params, Data>) => MaybePromise<unknown>;
@@ -158,11 +159,7 @@ interface WindowSpec {
  * const wizard = wb.build();    // → Dialog, register via dialogs([wizard])
  * ```
  */
-export class DialogBuilder<
-	State extends string,
-	Params,
-	Data extends DataDict,
-> {
+export class DialogBuilder<State extends string, Params, Data extends AnyData> {
 	private readonly declared = new Set<string>();
 	private readonly specs: WindowSpec[] = [];
 
@@ -185,7 +182,7 @@ export class DialogBuilder<
 	}
 
 	/** Type the mutable `dialogData` for this dialog. */
-	data<D extends DataDict>(): DialogBuilder<State, Params, D> {
+	data<D extends AnyData>(): DialogBuilder<State, Params, D> {
 		return this as unknown as DialogBuilder<State, Params, D>;
 	}
 
@@ -196,7 +193,7 @@ export class DialogBuilder<
 	}
 
 	/** Declare a window. `state` is constrained to the declared states. */
-	window<WData extends DataDict = DataDict>(
+	window<WData extends AnyData = DataDict>(
 		state: State,
 		options: TypedWindowOptions<WData, State, Params, Data> = {},
 	): this {

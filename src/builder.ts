@@ -1,19 +1,20 @@
 import type {
-	DataDict,
+	AnyData,
 	Getter,
 	RenderContext,
+	RenderData,
 	Stringable,
 	TextWidget,
 	WhenCondition,
 } from "./types.ts";
 import { Format } from "./widgets/text.ts";
 
-export interface WindowTyping<Data extends DataDict> {
+export interface WindowTyping<Data extends AnyData> {
 	/** Identity wrapper that pins a getter to `Data` (so `text`/`when` infer it). */
 	getter(fn: Getter<Data>): Getter<Data>;
-	/** Typed dynamic text — `data` is your `Data`. */
+	/** Typed dynamic text — `data` is your `Data` (plus the injected `dialogData`). */
 	text(
-		fn: (data: Data, rc: RenderContext<Data>) => Stringable,
+		fn: (data: RenderData<Data>, rc: RenderContext<Data>) => Stringable,
 	): TextWidget<Data>;
 	/** Typed `when` condition — `rc.data` is your `Data`. */
 	when(fn: (rc: RenderContext<Data>) => boolean): WhenCondition<Data>;
@@ -37,7 +38,7 @@ export interface WindowTyping<Data extends DataDict> {
  * });
  * ```
  */
-export function defineWindow<Data extends DataDict>(): WindowTyping<Data> {
+export function defineWindow<Data extends AnyData>(): WindowTyping<Data> {
 	return {
 		getter: (fn) => fn,
 		text: (fn) => Format<Data>(fn),

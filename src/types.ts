@@ -11,18 +11,28 @@ export type MaybePromise<T> = T | Promise<T>;
 export type Stringable = string | { toString(): string };
 
 /**
- * Plain JSON-serializable bag used for dialog/widget data, and the constraint for
- * a typed `Window<Data>` / getter.
- *
- * ⚠️ Type your `Data` with a **`type` alias, not an `interface`** — TS interfaces
- * have no implicit index signature, so they don't satisfy `Record<string, unknown>`:
- *
- * ```ts
- * interface MenuData { loggedIn: boolean } // ✗ doesn't satisfy DataDict
- * type MenuData = { loggedIn: boolean };   // ✓
- * ```
+ * Plain JSON-serializable bag the engine **stores and indexes** for dialog/widget
+ * data. This is the concrete value type — always string-keyed. For the *constraint*
+ * on a typed `Window<Data>` / getter (which also accepts a TS `interface`), see
+ * {@link AnyData}; the engine erases `Data` back to `DataDict` at its render seam.
  */
 export type DataDict = Record<string, unknown>;
+
+/**
+ * Constraint for user-supplied `Data` (a window's getter output). Unlike
+ * {@link DataDict} it also accepts a TS **`interface`** — interfaces have no implicit
+ * index signature so they don't satisfy `Record<string, unknown>`, but they are still
+ * plain objects:
+ *
+ * ```ts
+ * interface MenuData { loggedIn: boolean } // ✓ accepted (it's an object)
+ * type MenuData = { loggedIn: boolean };   // ✓ accepted
+ * ```
+ *
+ * (`Record<PropertyKey, unknown> | object` is equivalent to `object`; spelled out to
+ * document that the interface-accepting arm is deliberate, not an oversight.)
+ */
+export type AnyData = Record<PropertyKey, unknown> | object;
 
 /** gramio contexts the dialog engine listens on. */
 export type CallbackCtx = ContextType<Bot, "callback_query">;
@@ -145,18 +155,27 @@ export interface RawButton {
 }
 
 /**
- * Data passed to every widget's render method.
- *
- * Generic over the window's getter output: widgets used inside a typed
- * `Window<Data>` see `data: Data` (defaults to the loose {@link DataDict}).
+ * What render callbacks actually receive: the window's `Data` **plus** the bag the
+ * engine injects before rendering (`dialogData` / `startData`, and always
+ * string-indexable). Because `AnyData & DataDict` collapses to {@link DataDict}, an
+ * untyped window stays indexable here even though the {@link AnyData} constraint
+ * itself is not — so `d.dialogData` keeps working whether `Data` is a `type`, an
+ * `interface`, or inferred.
  */
-export interface RenderContext<Data extends DataDict = DataDict> {
+export type RenderData<Data extends AnyData = DataDict> = Data & DataDict;
+
+/**
+ * Data passed to every widget's render method. Generic over the window's getter
+ * output; `data` is {@link RenderData} — the getter's `Data` plus the
+ * engine-injected `dialogData` / `startData`.
+ */
+export interface RenderContext<Data extends AnyData = DataDict> {
 	/** Merged getter output (+ `dialogData`, `startData`). */
-	data: Data;
+	data: RenderData<Data>;
 	manager: DialogManager;
 }
 
-export interface TextWidget<Data extends DataDict = DataDict> {
+export interface TextWidget<Data extends AnyData = DataDict> {
 	renderText(ctx: RenderContext<Data>): MaybePromise<Stringable>;
 }
 
@@ -164,12 +183,12 @@ export interface TextWidget<Data extends DataDict = DataDict> {
  * Anything accepted where text is expected: a bare string, a `(data) => …`
  * function, or a {@link TextWidget}. Normalised by `asText`.
  */
-export type TextSource<Data extends DataDict = DataDict> =
+export type TextSource<Data extends AnyData = DataDict> =
 	| string
 	| TextWidget<Data>
-	| ((data: Data, ctx: RenderContext<Data>) => Stringable);
+	| ((data: RenderData<Data>, ctx: RenderContext<Data>) => Stringable);
 
-export interface MediaWidget<Data extends DataDict = DataDict> {
+export interface MediaWidget<Data extends AnyData = DataDict> {
 	renderMedia(
 		ctx: RenderContext<Data>,
 	): MaybePromise<RenderedMedia | undefined>;
@@ -186,7 +205,7 @@ export interface RenderedMedia {
 	media: string | Blob;
 }
 
-export interface Keyboard<Data extends DataDict = DataDict> {
+export interface Keyboard<Data extends AnyData = DataDict> {
 	renderKeyboard(ctx: RenderContext<Data>): MaybePromise<RawButton[][]>;
 	/**
 	 * Try to handle a callback routed by widgetId.
@@ -199,7 +218,7 @@ export interface Keyboard<Data extends DataDict = DataDict> {
 	): MaybePromise<boolean>;
 }
 
-export type WhenCondition<Data extends DataDict = DataDict> =
+export type WhenCondition<Data extends AnyData = DataDict> =
 	| boolean
 	| ((ctx: RenderContext<Data>) => boolean);
 
@@ -226,7 +245,7 @@ export type DialogEventCtx = DialogUpdateCtx & { dialog: DialogManager };
  * synthetic (`is()` is always `false`, `from.id === chatId`), so don't rely on
  * interactive-only update fields beyond `from.id` / `chatId` / `senderId`.
  */
-export type Getter<Data extends DataDict = DataDict> = (
+export type Getter<Data extends AnyData = DataDict> = (
 	ctx: DialogEventCtx,
 ) => MaybePromise<Data>;
 

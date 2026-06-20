@@ -2,6 +2,7 @@ import type { DialogManager } from "./manager.ts";
 import type {
 	AccessCheck,
 	AccessDeniedHandler,
+	AnyData,
 	DataDict,
 	DialogNav,
 	DialogUpdateCtx,
@@ -18,7 +19,7 @@ export interface DialogOptions {
 	/** Unique id of this dialog — also the "state group" id. */
 	id: string;
 	/** Windows declared up-front (alternative to the `.window()` builder). */
-	windows?: Window[];
+	windows?: Window<AnyData>[];
 	/** Dialog-level getter, merged under each window's getter. */
 	getter?: Getter;
 	/** Called after the dialog is pushed onto the stack. */
@@ -52,7 +53,7 @@ export type DialogConfig = Omit<DialogOptions, "id" | "windows">;
  * property order, and an untyped `Column(...)` doesn't widen `Data` back to
  * `DataDict`.
  */
-export interface BuilderWindow<Data extends DataDict, Params> {
+export interface BuilderWindow<Data extends AnyData, Params> {
 	text?: TextSource<NoInfer<Data>>;
 	keyboard?: Keyboard<NoInfer<Data>>;
 	media?: MediaWidget<NoInfer<Data>>;
@@ -80,7 +81,7 @@ export class Dialog<Params = unknown> {
 	readonly access?: AccessCheck;
 	readonly onAccessDenied?: AccessDeniedHandler;
 
-	private readonly windows = new Map<string, Window>();
+	private readonly windows = new Map<string, Window<AnyData>>();
 	private readonly order: string[] = [];
 
 	constructor(options: DialogOptions);
@@ -98,7 +99,7 @@ export class Dialog<Params = unknown> {
 		for (const window of options.windows ?? []) this.add(window);
 	}
 
-	private add(window: Window): void {
+	private add(window: Window<AnyData>): void {
 		if (this.windows.has(window.state))
 			throw new Error(
 				`Dialog "${this.id}" has duplicate window state "${window.state}"`,
@@ -108,7 +109,7 @@ export class Dialog<Params = unknown> {
 	}
 
 	/** Incrementally declare a window. `Data` is inferred from `getter`. Chainable. */
-	window<Data extends DataDict = DataDict>(
+	window<Data extends AnyData = DataDict>(
 		state: string,
 		options: BuilderWindow<Data, Params> = {},
 	): this {
@@ -127,7 +128,7 @@ export class Dialog<Params = unknown> {
 		return first;
 	}
 
-	getWindow(state: string): Window {
+	getWindow(state: string): Window<AnyData> {
 		const window = this.windows.get(state);
 		if (!window)
 			throw new Error(`Dialog "${this.id}" has no window for state "${state}"`);

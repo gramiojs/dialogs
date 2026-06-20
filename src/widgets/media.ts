@@ -2,6 +2,7 @@ import { barcodePNG, qrcodePNG } from "etiket";
 import { MediaUpload } from "gramio";
 import type { DialogManager } from "../manager.ts";
 import type {
+	AnyData,
 	ClickCtx,
 	DataDict,
 	Keyboard,
@@ -39,7 +40,7 @@ function clamp(value: number, min: number, max: number): number {
 /** Widget-data suffix where a {@link MediaScroll} caches its current item count. */
 const COUNT_SUFFIX = "#count";
 
-export interface MediaScrollOptions<Data extends DataDict = DataDict> {
+export interface MediaScrollOptions<Data extends AnyData = DataDict> {
 	/** Widget id — the current page index is stored under it in widget data. */
 	id: string;
 	/** The media frames to scroll through — a static array or computed from data. */
@@ -63,7 +64,7 @@ export interface MediaScrollOptions<Data extends DataDict = DataDict> {
  * `media` slot to show the current frame, and in the keyboard tree to render the
  * `‹ i/N ›` pager (e.g. `media: gallery, keyboard: Column([gallery, Back()])`).
  */
-class MediaScrollWidget<Data extends DataDict>
+class MediaScrollWidget<Data extends AnyData>
 	implements MediaWidget<Data>, Keyboard<Data>
 {
 	constructor(private readonly opts: MediaScrollOptions<Data>) {}
@@ -89,7 +90,7 @@ class MediaScrollWidget<Data extends DataDict>
 	}
 
 	async renderKeyboard(rc: RenderContext<Data>): Promise<RawButton[][]> {
-		if (isHidden(this.opts.when as WhenCondition | undefined, rc)) return [];
+		if (isHidden(this.opts.when, rc)) return [];
 		const items = await this.resolve(rc);
 		const count = items.length;
 		rc.manager.setWidgetData(this.opts.id + COUNT_SUFFIX, count);
@@ -130,7 +131,7 @@ class MediaScrollWidget<Data extends DataDict>
 	}
 }
 
-export function MediaScroll<Data extends DataDict = DataDict>(
+export function MediaScroll<Data extends AnyData = DataDict>(
 	options: MediaScrollOptions<Data>,
 ): MediaWidget<Data> & Keyboard<Data> {
 	return new MediaScrollWidget(options);
@@ -149,7 +150,7 @@ export function mediaScrollPage(
 
 // ───────────────────────── QR / Barcode ─────────────────────────
 
-export interface QROptions<Data extends DataDict = DataDict> {
+export interface QROptions<Data extends AnyData = DataDict> {
 	/** The text/URL to encode — static or computed from data. */
 	data: string | ((data: Data) => string);
 	/** QR module size in px. Defaults to 8. */
@@ -168,7 +169,7 @@ export interface QROptions<Data extends DataDict = DataDict> {
  * [etiket](https://github.com/productdevbook/etiket) (zero-dependency PNG) — no
  * external service. Pass `endpoint` to use an image URL instead. Window `media`.
  */
-export function QR<Data extends DataDict = DataDict>(
+export function QR<Data extends AnyData = DataDict>(
 	options: QROptions<Data>,
 ): MediaWidget<Data> {
 	return {
@@ -204,7 +205,7 @@ export type BarcodeType =
 	| "aztec"
 	| (string & {});
 
-export interface BarcodeOptions<Data extends DataDict = DataDict> {
+export interface BarcodeOptions<Data extends AnyData = DataDict> {
 	/** The value to encode — static or computed from data. */
 	data: string | ((data: Data) => string);
 	/** Symbology. Defaults to `"code128"`. */
@@ -217,7 +218,7 @@ export interface BarcodeOptions<Data extends DataDict = DataDict> {
  * A barcode as a photo, generated locally with etiket (40+ symbologies, zero
  * dependencies). Use as a window's `media`.
  */
-export function Barcode<Data extends DataDict = DataDict>(
+export function Barcode<Data extends AnyData = DataDict>(
 	options: BarcodeOptions<Data>,
 ): MediaWidget<Data> {
 	return {

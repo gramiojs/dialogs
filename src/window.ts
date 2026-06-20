@@ -1,4 +1,5 @@
 import type {
+	AnyData,
 	DataDict,
 	Getter,
 	InputCtx,
@@ -11,7 +12,7 @@ import type {
 } from "./types.ts";
 import { asText } from "./widgets/text.ts";
 
-export interface WindowOptions<Data extends DataDict = DataDict> {
+export interface WindowOptions<Data extends AnyData = DataDict> {
 	/** Unique state key within the owning dialog. */
 	state: string;
 	/** Window text: a bare string, `(data) => …`, or a text widget. */
@@ -45,7 +46,7 @@ export interface WindowOptions<Data extends DataDict = DataDict> {
  * Pure composition of widgets — no logic of its own beyond delegating to its
  * text / keyboard / media widgets and `onMessage` handler.
  */
-export class Window<Data extends DataDict = DataDict> {
+export class Window<Data extends AnyData = DataDict> {
 	readonly state: string;
 	readonly text?: TextWidget<Data>;
 	readonly keyboard?: Keyboard<Data>;

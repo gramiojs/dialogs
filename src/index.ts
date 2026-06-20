@@ -39,6 +39,7 @@ export {
 export {
 	type AccessCheck,
 	type AccessDeniedHandler,
+	type AnyData,
 	type ButtonStyle,
 	type ClickCtx,
 	type DataDict,
@@ -57,6 +58,7 @@ export {
 	type MediaWidget,
 	type RawButton,
 	type RenderContext,
+	type RenderData,
 	type RenderedMedia,
 	type ReplyRequest,
 	ShowMode,
