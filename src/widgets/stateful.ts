@@ -208,6 +208,18 @@ export interface SelectOptions<T> {
 	items: ItemsGetter<T>;
 	itemId: ItemId<T>;
 	onClick: OnItemClick<T>;
+	/**
+	 * For a stateless Select backed by external state (e.g. a setting in your DB),
+	 * return the currently-selected `itemId`. The matching item gets `checked: true`
+	 * in its text-state and a ✓ ({@link SelectOptions.selectedMark}) appended — no
+	 * need to compute the mark by hand from `st.data`. `data` is the merged render
+	 * bag (getter output + `dialogData`), same as `items`/`text` see. If your `text`
+	 * callback already appends its own mark from `st.checked`, set `selectedMark: ""`
+	 * to avoid a double mark.
+	 */
+	selected?: (data: DataDict) => string | number | undefined;
+	/** Suffix appended to the selected item's label. Defaults to `" ✓"`. */
+	selectedMark?: string;
 	when?: WhenCondition;
 }
 
@@ -216,17 +228,18 @@ class SelectWidget<T> extends ItemWidget<T> {
 		super(opts.id, opts.items, opts.itemId, opts.when);
 	}
 
-	protected itemText(
+	protected async itemText(
 		rc: RenderContext,
 		item: T,
-		_idStr: string,
+		idStr: string,
 		index: number,
 	): Promise<Stringable> {
-		return Promise.resolve(
-			itemTextWidget<T>(this.opts.text).renderText(
-				augment(rc, { item, index }),
-			),
+		const sel = this.opts.selected?.(rc.data);
+		const checked = sel !== undefined && String(sel) === idStr;
+		const label = await itemTextWidget<T>(this.opts.text).renderText(
+			augment(rc, { item, index, checked }),
 		);
+		return checked ? `${label}${this.opts.selectedMark ?? " ✓"}` : label;
 	}
 
 	protected async onItem(manager: DialogManager, idStr: string): Promise<void> {

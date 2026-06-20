@@ -54,7 +54,10 @@ export type TypedDialog<
  */
 export interface TypedNav<State extends string, Params, Data extends DataDict>
 	extends Omit<DialogNav<Params>, "switchTo" | "dialogData"> {
-	switchTo(state: State, mode?: ShowMode): Promise<void>;
+	switchTo(
+		state: State,
+		modeOrOptions?: ShowMode | { data?: Partial<Data>; mode?: ShowMode },
+	): Promise<void>;
 	readonly dialogData: Data;
 }
 

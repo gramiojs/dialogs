@@ -187,8 +187,10 @@ export class DialogManager {
 	private attachContext(): void {
 		const ctx = this.ctx as unknown as Record<string, unknown>;
 		ctx.dialog = this;
-		ctx.switchTo = (state: string, mode?: ShowMode) =>
-			this.switchTo(state, mode);
+		ctx.switchTo = (
+			state: string,
+			modeOrOptions?: ShowMode | { data?: DataDict; mode?: ShowMode },
+		) => this.switchTo(state, modeOrOptions);
 		ctx.back = (mode?: ShowMode) => this.back(mode);
 		ctx.next = (mode?: ShowMode) => this.next(mode);
 		ctx.done = (result?: unknown, mode?: ShowMode) => this.done(result, mode);
@@ -378,16 +380,25 @@ export class DialogManager {
 
 	async switchTo(
 		stateKey: string,
-		mode: ShowMode = ShowMode.Auto,
+		modeOrOptions:
+			| ShowMode
+			| { data?: DataDict; mode?: ShowMode } = ShowMode.Auto,
 	): Promise<void> {
+		const options =
+			typeof modeOrOptions === "object" && modeOrOptions !== null
+				? modeOrOptions
+				: { mode: modeOrOptions as ShowMode };
 		const context = this.requireContext();
 		this.registry.get(context.groupId).getWindow(stateKey); // validate
+		// Merge data BEFORE the render so the TARGET window's getter/text sees it —
+		// atomic "set data + navigate" without an extra edit of the current window.
+		if (options.data) Object.assign(context.data, options.data);
 		if (stateKey !== context.stateKey) {
 			context.history.push(context.stateKey); // remember where we came from
 			if (context.history.length > MAX_STACK_DEPTH) context.history.shift();
 		}
 		context.stateKey = stateKey;
-		await this.render(mode);
+		await this.render(options.mode ?? ShowMode.Auto);
 		await this.persist();
 	}
 
@@ -455,6 +466,17 @@ export class DialogManager {
 	async update(data: DataDict, mode: ShowMode = ShowMode.Auto): Promise<void> {
 		Object.assign(this.requireContext().data, data);
 		await this.render(mode);
+		await this.persist();
+	}
+
+	/**
+	 * Merge a patch into the current dialog's `data` and persist — WITHOUT
+	 * rendering. Use from a background callback to stage data before navigating
+	 * (e.g. `setData(...)` then `switchTo(target)`), so you never re-render the
+	 * window the user might have left. See also `switchTo(state, { data })`.
+	 */
+	async setData(patch: DataDict): Promise<void> {
+		Object.assign(this.requireContext().data, patch);
 		await this.persist();
 	}
 

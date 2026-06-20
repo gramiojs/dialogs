@@ -157,7 +157,10 @@ const confirm = new Dialog<{ orderId: number }>("confirm").window("ask", {
 | **getter output** | a `getter` function | the `data` arg in `text`/`keyboard` | recomputed every render |
 
 Inside a render, `data` is `dialog.getter` ⊕ `window.getter` output, plus
-`data.dialogData` and `data.startData` for convenience.
+`data.dialogData` and `data.startData` for convenience. The order matters: getters
+run **first**, so a getter reads the live dialog data via **`ctx.dialogData`**
+(also `ctx.params`) — not via its own `data` arg, which doesn't exist yet. In
+`text` / `keyboard`, read `rc.data.dialogData`.
 
 ## Navigation — `ctx.dialog` (and flat `ctx.*`)
 
@@ -167,7 +170,7 @@ Every method on the manager is also mirrored flat on the context, so
 ```ts
 ctx.dialog                                   // the DialogManager itself
 ctx.start(dialog, state?, { data?, mode?, startMode? })  // open a dialog (push)
-ctx.switchTo(state, mode?)   // jump to a sibling window — records back-history
+ctx.switchTo(state, mode? | { data?, mode? })  // jump to a window; `{ data }` merges into dialogData FIRST
 ctx.back(mode?)              // history: undo the last switchTo / next
 ctx.next(mode?)              // next window in declaration order (linear wizards)
 ctx.done(result?, mode?)     // close this dialog, hand result to the opener
@@ -178,6 +181,7 @@ ctx.params                   // immutable start params
 
 // only on ctx.dialog (not mirrored flat):
 ctx.dialog.update(partial, mode?)        // merge into dialogData + re-render
+ctx.dialog.setData(partial)              // merge into dialogData + persist, NO render
 ctx.dialog.counter(id)                   // { get, set }
 ctx.dialog.checkbox(id)                  // { checked, set, toggle }
 ctx.dialog.radio(id)                     // { selected, set }
@@ -291,6 +295,23 @@ await mgr.update({ price: 42 });                    // edits the last rendered m
 It defaults to **editing** the last message and throws if the stack has never been
 rendered (there's no message to edit).
 
+**Stage data, then navigate.** From a background callback the user may have left the
+window you expect, so re-rendering the *current* one (`update`) can be wrong. Set the
+data without rendering, then jump to the target — only the target window renders:
+
+```ts
+await mgr.setData({ failReason });        // merge into dialogData, no render
+await mgr.switchTo("login_fail");         // renders the TARGET window
+// …or in one call:
+await mgr.switchTo("login_fail", { data: { failReason } });
+```
+
+**Headless getters must be render-source agnostic.** Under `background()` the context
+is synthetic: `ctx.is(...)` is always `false`, and `ctx.from` / `ctx.chatId` /
+`ctx.senderId` all resolve to the chat id (private chats only). Read the user id as
+`ctx.from?.id` and don't reach for interactive-only update fields — a getter that
+does will work live but render `undefined` from the background.
+
 ## Plugin registration & options
 
 ```ts
@@ -342,6 +363,20 @@ SwitchTo("Settings", "settings", { icon: "5283103725936750105", style: "primary"
 | **Money / AI** | `StarsButton` (Telegram Stars), `stream` (`sendMessageDraft`) |
 | **Charts / codes** | `Sparkline`, `BarChart`, `Gauge`, `QR`, `Barcode` |
 | **Input / Media** | `TextInput` (+ `getInput`), `StaticMedia`, `DynamicMedia`, `MediaScroll` (+ `mediaScrollPage`) |
+
+**Stateless `Select` over external state.** For a `Select` backed by a source of
+truth you own (a setting in your DB, not widget data), pass `selected` to mark the
+current choice — the matching item gets a ✓ (override via `selectedMark`) and
+`checked: true` in its text state, so you don't compute the mark by hand:
+
+```ts
+Select({
+  id: "lang", items: (d) => d.langs, itemId: (l) => l.code,
+  text: (st) => st.item.name,
+  selected: (d) => d.currentLang,      // → "English ✓"
+  onClick: (ctx, code) => saveLang(ctx.from!.id, code),
+});
+```
 
 > **`callback_data` budget:** Telegram caps inline `callback_data` at 64 bytes and
 > rejects the whole keyboard if you exceed it. Use **short item ids** (list indices),

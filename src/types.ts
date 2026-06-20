@@ -10,7 +10,18 @@ export type MaybePromise<T> = T | Promise<T>;
  */
 export type Stringable = string | { toString(): string };
 
-/** Plain JSON-serializable bag used for dialog/widget data. */
+/**
+ * Plain JSON-serializable bag used for dialog/widget data, and the constraint for
+ * a typed `Window<Data>` / getter.
+ *
+ * ⚠️ Type your `Data` with a **`type` alias, not an `interface`** — TS interfaces
+ * have no implicit index signature, so they don't satisfy `Record<string, unknown>`:
+ *
+ * ```ts
+ * interface MenuData { loggedIn: boolean } // ✗ doesn't satisfy DataDict
+ * type MenuData = { loggedIn: boolean };   // ✓
+ * ```
+ */
 export type DataDict = Record<string, unknown>;
 
 /** gramio contexts the dialog engine listens on. */
@@ -45,7 +56,15 @@ export type StartParamsOf<Ref> = Ref extends { __types?: { params: infer P } }
 
 export interface DialogNav<Params = unknown> {
 	dialog: DialogManager;
-	switchTo(state: string, mode?: ShowMode): Promise<void>;
+	/**
+	 * Navigate to `state`. Pass `{ data }` to merge into `dialogData` before the
+	 * target window renders — an atomic "set data + navigate" (no extra edit of
+	 * the current window). A bare {@link ShowMode} still works as the 2nd arg.
+	 */
+	switchTo(
+		state: string,
+		modeOrOptions?: ShowMode | { data?: DataDict; mode?: ShowMode },
+	): Promise<void>;
 	back(mode?: ShowMode): Promise<void>;
 	next(mode?: ShowMode): Promise<void>;
 	done(result?: unknown, mode?: ShowMode): Promise<void>;
@@ -196,7 +215,17 @@ export interface InputWidget {
  */
 export type DialogEventCtx = DialogUpdateCtx & { dialog: DialogManager };
 
-/** A getter loads data for a window/dialog before rendering. */
+/**
+ * A getter loads data for a window/dialog before rendering. Its return value is
+ * merged into the render `data`, then `dialogData` and `startData` are added on
+ * top — so in `text`/`keyboard` you read `rc.data.dialogData`. Inside the getter
+ * itself, the live dialog data is `ctx.dialogData` (also `ctx.dialog.data`); both
+ * are populated even on the headless `background()` ctx.
+ *
+ * Getters must be render-source agnostic: under `background()` the ctx is
+ * synthetic (`is()` is always `false`, `from.id === chatId`), so don't rely on
+ * interactive-only update fields beyond `from.id` / `chatId` / `senderId`.
+ */
 export type Getter<Data extends DataDict = DataDict> = (
 	ctx: DialogEventCtx,
 ) => MaybePromise<Data>;

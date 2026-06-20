@@ -34,12 +34,19 @@ export interface DialogsOptions {
 /** Minimal bot shape the background manager needs. */
 type BotLikeApi = { api: Bot["api"] };
 
-/** Synthetic context for headless (background) renders — edits the last message. */
+/**
+ * Synthetic context for headless (background) renders — edits the last message.
+ *
+ * In private chats `chatId === senderId === userId`, so we synthesize `from.id`
+ * too: getters written for the interactive path (`ctx.from.id`) keep working
+ * when re-rendered from `background()` instead of crashing on `undefined.id`.
+ */
 function headlessCtx(bot: BotLikeApi, chatId: number): DialogUpdateCtx {
 	return {
 		is: () => false,
 		chatId,
 		senderId: chatId,
+		from: { id: chatId },
 		bot,
 		answer: async () => true,
 	} as unknown as DialogUpdateCtx;
