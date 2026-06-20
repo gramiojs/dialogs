@@ -511,6 +511,10 @@ export class DialogManager {
 		data.dialogData = context.data;
 		data.startData = context.startData;
 
+		// The engine is the sole writer of `data` here (getter output + dialogData/
+		// startData), so this single internal `RenderContext<DataDict>` is the erasure
+		// point for `Window<AnyData>`: typed windows trust their getter's contract, not
+		// this site. Don't "tighten" it with a per-window assertion — it would be a lie.
 		const rc: RenderContext = { data, manager: this };
 		const text = window.text ? await window.text.renderText(rc) : "";
 		const media = window.media ? await window.media.renderMedia(rc) : undefined;
@@ -842,9 +846,18 @@ export class DialogManager {
 
 	/** Close the callback spinner with no text (tolerates messages with no `answer`). */
 	private async silentAnswer(): Promise<void> {
-		const answer = (this.ctx as { answer?: (t?: string) => Promise<unknown> })
-			.answer;
-		await answer?.()?.catch(() => undefined);
+		const ctx = this.ctx as { answer?: (text?: string) => Promise<unknown> };
+		if (typeof ctx.answer !== "function") return;
+		try {
+			// Call it ON `ctx` so `this` is preserved. gramio's `answer` is a prototype
+			// alias delegating to `this.bot.api.answerCallbackQuery`; detaching it
+			// (`const a = ctx.answer; a()`) leaves `this` undefined → a SYNCHRONOUS
+			// throw that `.catch()` never sees, which then surfaces in the bot's
+			// onError. `try/catch` swallows both the sync throw and any rejection.
+			await ctx.answer();
+		} catch {
+			// best-effort: closing the spinner must never break the update
+		}
 	}
 
 	private async routePacked(
@@ -906,7 +919,7 @@ export class DialogManager {
 		}
 		// "denied" was already answered inside routePacked (or routed to onAccessDenied).
 		if (result === "denied") return true;
-		await this.ctx.answer().catch(() => undefined);
+		await this.silentAnswer(); // bound + sync-throw-safe spinner close
 		return true;
 	}
 
