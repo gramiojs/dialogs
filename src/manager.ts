@@ -93,27 +93,19 @@ function buttonOpts(
 }
 
 const cbEncoder = new TextEncoder();
-const warnedWidgets = new Set<string>();
-
-/**
- * Test/diagnostic hook: clear the "callback_data too long" once-per-widget
- * dedup set so the warning's once-only semantics can be asserted deterministically.
- */
-export function __resetCallbackWarnings(): void {
-	warnedWidgets.clear();
-}
 
 /**
  * Telegram rejects inline buttons whose `callback_data` exceeds 64 bytes — the
- * whole `sendMessage` fails. Warn (once per widget) so it's caught in dev
- * instead of surfacing as "the keyboard silently doesn't work".
+ * whole send/edit fails with an opaque Bot API error. Fail fast at keyboard-build
+ * time instead, naming the offending widget, so it surfaces as an actionable error
+ * (in dev, and locally inside the render) rather than a cryptic rejection escaping
+ * to the host's `onError`. Use short item ids (list indices), never long strings.
  */
-function warnIfTooLong(data: string, widgetId: string): void {
-	if (cbEncoder.encode(data).length <= 64 || warnedWidgets.has(widgetId))
-		return;
-	warnedWidgets.add(widgetId);
-	console.warn(
-		`[@gramio/dialogs] callback_data for widget "${widgetId}" is ${cbEncoder.encode(data).length} bytes (> 64). Telegram will reject this keyboard. Use a short item id (e.g. a list index) instead of long strings as the payload.`,
+function assertCallbackFits(data: string, widgetId: string): void {
+	const bytes = cbEncoder.encode(data).length;
+	if (bytes <= 64) return;
+	throw new Error(
+		`[@gramio/dialogs] callback_data for widget "${widgetId}" is ${bytes} bytes (> 64). Telegram would reject this keyboard — use a short item id (e.g. a list index) instead of long strings as the widget payload.`,
 	);
 }
 
@@ -126,9 +118,11 @@ function warnIfTooLong(data: string, widgetId: string): void {
  */
 export class DialogManager {
 	readonly ctx: DialogUpdateCtx;
-	private readonly store: StackStore;
+	/** Reassigned by {@link _reloadStore} when re-read fresh under a per-key lock. */
+	private store: StackStore;
 	private readonly repo: StackRepository;
-	private readonly storageKey: string;
+	/** Stack key this manager persists under — used by the engine's per-key lock. */
+	readonly storageKey: string;
 	private readonly registry: DialogRegistry;
 	private readonly headless: boolean;
 	private readonly i18nResolver?: I18nResolver;
@@ -565,7 +559,7 @@ export class DialogManager {
 							? { i: intentId, w: button.cb.widgetId }
 							: { i: intentId, w: button.cb.widgetId, p: button.cb.payload },
 					);
-					warnIfTooLong(data, button.cb.widgetId);
+					assertCallbackFits(data, button.cb.widgetId);
 					keyboard.text(button.text, data, opts);
 				}
 			}
@@ -831,6 +825,15 @@ export class DialogManager {
 		await this.repo.saveStore(this.storageKey, this.store);
 	}
 
+	/**
+	 * @internal Re-read the persisted store. The engine calls this inside a per-key
+	 * lock right before handling an update, so concurrent updates on the same stack
+	 * key can't read a stale snapshot and clobber each other (lost-update race).
+	 */
+	async _reloadStore(): Promise<void> {
+		this.store = await this.repo.loadStore(this.storageKey);
+	}
+
 	// ───────────────────────── engine entry points (internal) ─────────────────────────
 
 	/**
@@ -871,11 +874,18 @@ export class DialogManager {
 		const owner = this.store.stacks.find(
 			(s) => s.intents.at(-1)?.intentId === unpacked.data.i,
 		);
+		// Track the reselection so the early-return paths below persist it too —
+		// otherwise the in-memory `currentId` flip is dropped (storage keeps the old
+		// one, and the manager is rebuilt from storage each update).
+		const reselected = !!owner && this.store.currentId !== owner.id;
 		if (owner) this.store.currentId = owner.id;
 
 		const context = this.context;
 		if (!context) return "handled";
-		if (unpacked.data.i !== context.intentId) return "stale";
+		if (unpacked.data.i !== context.intentId) {
+			if (reselected) await this.persist();
+			return "stale";
+		}
 
 		const dialog = this.registry.get(context.groupId);
 		if (!(await this.accessAllowed(context.groupId))) {
@@ -883,6 +893,7 @@ export class DialogManager {
 			const handler = dialog.onAccessDenied ?? this.events.onAccessDenied;
 			if (handler) await handler(this.ctx as DialogEventCtx);
 			else await this.silentAnswer();
+			if (reselected) await this.persist();
 			return "denied";
 		}
 
@@ -934,11 +945,19 @@ export class DialogManager {
 		if (text) {
 			const decoded = decodeReplyData(text);
 			if (decoded) {
-				// onClick handlers expect ctx.answer(); messages have none → shim it.
+				// onClick handlers expect ctx.answer(); reply-keyboard taps arrive as
+				// messages with none → shim it, but SCOPE the stub: restore afterwards so
+				// we don't leave a no-op `answer` on the shared gramio context for the
+				// rest of the middleware chain (which would swallow downstream answers).
 				const shimmed = this.ctx as { answer?: () => Promise<true> };
-				if (!shimmed.answer) shimmed.answer = async () => true;
-				const result = await this.routePacked(decoded.data);
-				if (result !== "foreign") return true;
+				const addedShim = typeof shimmed.answer !== "function";
+				if (addedShim) shimmed.answer = async () => true;
+				try {
+					const result = await this.routePacked(decoded.data);
+					if (result !== "foreign") return true;
+				} finally {
+					if (addedShim) shimmed.answer = undefined;
+				}
 			}
 		}
 

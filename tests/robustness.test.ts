@@ -48,7 +48,7 @@ describe("engine robustness / contracts", () => {
 		expect(h.last().text).toBe("n=42");
 	});
 
-	it("warns (once) when a button's callback_data exceeds 64 bytes", async () => {
+	it("throws when a button's callback_data exceeds 64 bytes", async () => {
 		const longId = "x".repeat(90); // packed payload will exceed the 64-byte cap
 		const dialog = new Dialog({
 			id: "w",
@@ -60,18 +60,11 @@ describe("engine robustness / contracts", () => {
 				}),
 			],
 		});
-		const warnings: string[] = [];
-		const original = console.warn;
-		console.warn = (msg?: unknown) => warnings.push(String(msg));
-		try {
-			const h = createHarness([dialog]);
-			await h.reset();
-			await (await h.managerFor(h.makeCtx("message"))).start("w");
-		} finally {
-			console.warn = original;
-		}
-		expect(
-			warnings.some((w) => w.includes("callback_data") && w.includes("> 64")),
-		).toBe(true);
+		const h = createHarness([dialog]);
+		await h.reset();
+		// fail-fast at build instead of letting Telegram reject the whole send
+		await expect(
+			(await h.managerFor(h.makeCtx("message"))).start("w"),
+		).rejects.toThrow(/callback_data for widget .* is \d+ bytes/);
 	});
 });

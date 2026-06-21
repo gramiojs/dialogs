@@ -40,15 +40,25 @@ type BotLikeApi = { api: Bot["api"] };
  * In private chats `chatId === senderId === userId`, so we synthesize `from.id`
  * too: getters written for the interactive path (`ctx.from.id`) keep working
  * when re-rendered from `background()` instead of crashing on `undefined.id`.
+ *
+ * It carries only identity, though — `ctx.t`, `from.language_code`,
+ * `from.username`, `ctx.message`, etc. are absent. A getter/i18n-resolver that
+ * needs them must derive from `from.id`, or the caller can pass `overrides` (e.g.
+ * the real `from` with a locale) to {@link createDialogs}'s `background`.
  */
-function headlessCtx(bot: BotLikeApi, chatId: number): DialogUpdateCtx {
+function headlessCtx(
+	bot: BotLikeApi,
+	chatId: number,
+	overrides?: Partial<DialogUpdateCtx>,
+): DialogUpdateCtx {
 	return {
 		is: () => false,
 		chatId,
 		senderId: chatId,
-		from: { id: chatId },
+		from: { id: chatId, is_bot: false },
 		bot,
 		answer: async () => true,
+		...overrides,
 	} as unknown as DialogUpdateCtx;
 }
 
@@ -82,20 +92,39 @@ export function createDialogs(list: Dialog[], options: DialogsOptions = {}) {
 			return { dialog: manager };
 		})
 		.on("callback_query", async (ctx, next) => {
-			if (!(await ctx.dialog._handleCallback())) return next();
+			// Per-key lock + reload-under-lock: serialize concurrent updates on the
+			// same stack key so they can't read a stale store and clobber each other.
+			const handled = await repo.withLock(ctx.dialog.storageKey, async () => {
+				await ctx.dialog._reloadStore();
+				return ctx.dialog._handleCallback();
+			});
+			if (!handled) return next();
 		})
 		.on("message", async (ctx, next) => {
-			if (!(await ctx.dialog._handleMessage())) return next();
+			const handled = await repo.withLock(ctx.dialog.storageKey, async () => {
+				await ctx.dialog._reloadStore();
+				return ctx.dialog._handleMessage();
+			});
+			if (!handled) return next();
 		});
 
 	/**
 	 * Get a headless {@link DialogManager} for a user's stack, to edit its last
 	 * message from outside a handler. `switchTo` / `update` / `show` default to
 	 * editing. Throws if the stack has never been rendered (no message to edit).
+	 *
+	 * Pass `overrides` to enrich the synthetic ctx — e.g. the real `from` (with a
+	 * `language_code`) or a `t` translator — so getters / i18n that need more than
+	 * `from.id` work in the background render.
+	 *
+	 * To avoid a lost-update race with a concurrent live tap on the same key, wrap
+	 * the load+mutate in {@link withLock}:
+	 * `await withLock(key, async () => { const m = await background(bot, key); await m.switchTo(...); })`.
 	 */
 	async function background(
 		bot: BotLikeApi,
 		stackKey: string,
+		overrides?: Partial<DialogUpdateCtx>,
 	): Promise<DialogManager> {
 		const store = await repo.loadStore(stackKey);
 		const current =
@@ -103,7 +132,7 @@ export function createDialogs(list: Dialog[], options: DialogsOptions = {}) {
 		if (current?.lastChatId === undefined)
 			throw new Error(`Stack "${stackKey}" has no rendered message to update`);
 		return new DialogManager({
-			ctx: headlessCtx(bot, current.lastChatId),
+			ctx: headlessCtx(bot, current.lastChatId, overrides),
 			store,
 			repo,
 			storageKey: stackKey,
@@ -115,7 +144,15 @@ export function createDialogs(list: Dialog[], options: DialogsOptions = {}) {
 		});
 	}
 
-	return { plugin, background };
+	/**
+	 * Keyed async mutex over a stack key — wrap `background()` work in it to
+	 * serialize against live taps (and other background renders) on the same key.
+	 * The live update path already uses this internally. Single-process only.
+	 */
+	const withLock = <T>(key: string, fn: () => Promise<T>): Promise<T> =>
+		repo.withLock(key, fn);
+
+	return { plugin, background, withLock };
 }
 
 /**

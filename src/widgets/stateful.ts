@@ -206,6 +206,12 @@ export interface SelectOptions<T> {
 	/** Per-item text: a `(state) => …` callback (typed `item`) or a `TextWidget`. */
 	text: ItemText<T>;
 	items: ItemsGetter<T>;
+	/**
+	 * Stable id per item. Must be **collision-free as a string** (`String(id)`): the
+	 * ✓-match ({@link SelectOptions.selected}) and `callback_data` routing compare
+	 * ids stringified, so `1` and `"1"` would collide. Keep ids short — they ride in
+	 * `callback_data` (Telegram's 64-byte cap); prefer list indices over long strings.
+	 */
 	itemId: ItemId<T>;
 	onClick: OnItemClick<T>;
 	/**
