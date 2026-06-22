@@ -18,6 +18,7 @@ import {
 	Dialog,
 	Group,
 	SwitchTo,
+	createDialogs,
 	dialogs,
 } from "../src/index.ts";
 
@@ -159,5 +160,79 @@ describe("dialogs() plugin (real bot via @gramio/test)", () => {
 		await user.sendCommand("help");
 
 		expect(env.lastApiCall("sendMessage")?.params.text).toBe("help!");
+	});
+
+	// D2-2: two taps on the same stack must not lost-update each other. The plugin
+	// serializes callbacks per stack key (withLock) and re-reads the store under
+	// the lock; without that fix both handlers read volume=5 and the second clobbers
+	// the first (final 6 instead of 7).
+	it("serializes concurrent taps on the same counter (no lost update)", async () => {
+		await user.sendCommand("start");
+		const bubble = must(env.lastBotMessage());
+		await user.on(bubble).clickByText("⚙️ Settings");
+
+		await Promise.all([
+			user.on(bubble).clickByText("➕"),
+			user.on(bubble).clickByText("➕"),
+		]);
+
+		expect(
+			buttonTexts(env.lastApiCall("editMessageText")?.params?.reply_markup),
+		).toContain("🔊 7");
+	});
+
+	// D2-5: an over-long callback_data (Telegram's 64-byte cap) throws at keyboard
+	// build with the offending widget named, instead of warning then letting the
+	// send fail opaquely. The throw surfaces through the bot's onError.
+	it("throws a named error when a button's callback_data exceeds 64 bytes", async () => {
+		const errors: string[] = [];
+		const bot = new Bot("123:test")
+			.extend(
+				dialogs([
+					new Dialog("oversized").window("main", {
+						text: "hi",
+						keyboard: Column([
+							Button("boom", {
+								id: "x".repeat(80),
+								onClick: (ctx) => ctx.answer(),
+							}),
+						]),
+					}),
+				]),
+			)
+			.command("start", (ctx) => ctx.dialog.start("oversized"))
+			.onError(({ error }) => {
+				errors.push(error instanceof Error ? error.message : String(error));
+			});
+		const local = new TelegramTestEnvironment(bot);
+
+		await local.createUser({ first_name: "Eve" }).sendCommand("start");
+
+		expect(errors.some((m) => m.includes("64") && m.includes("callback_data"))).toBe(
+			true,
+		);
+	});
+});
+
+describe("createDialogs().background (real bot via @gramio/test)", () => {
+	// D2-1: edit a user's dialog message from OUTSIDE an update (timer/webhook/worker).
+	it("edits the last rendered message without an incoming update", async () => {
+		const menu = new Dialog("menu")
+			.window("main", { text: "main", keyboard: Column([SwitchTo("go", "two")]) })
+			.window("two", { text: "second screen" });
+		const { plugin, background } = createDialogs([menu]);
+		const bot = new Bot("123:test")
+			.extend(plugin)
+			.command("start", (ctx) => ctx.dialog.start("menu"));
+		const env = new TelegramTestEnvironment(bot);
+		const user = env.createUser({ first_name: "Alice" });
+
+		await user.sendCommand("start");
+		const key = `grd:${user.payload.id}`;
+
+		const manager = await background(bot, key);
+		await manager.switchTo("two");
+
+		expect(env.lastApiCall("editMessageText")?.params?.text).toBe("second screen");
 	});
 });
