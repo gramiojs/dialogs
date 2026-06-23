@@ -19,20 +19,18 @@ export type Stringable = string | { toString(): string };
 export type DataDict = Record<string, unknown>;
 
 /**
- * Constraint for user-supplied `Data` (a window's getter output). Unlike
- * {@link DataDict} it also accepts a TS **`interface`** — interfaces have no implicit
- * index signature so they don't satisfy `Record<string, unknown>`, but they are still
- * plain objects:
+ * Constraint for user-supplied `Data` (a window's getter output). It's just
+ * `object` — which, unlike {@link DataDict}'s `Record<string, unknown>`, ALSO
+ * accepts a TS `interface` (interfaces have no implicit index signature, but they
+ * are still objects). The engine erases `Data` back to {@link DataDict} at the
+ * render seam, so the loose constraint costs nothing downstream.
  *
  * ```ts
- * interface MenuData { loggedIn: boolean } // ✓ accepted (it's an object)
+ * interface MenuData { loggedIn: boolean } // ✓ accepted
  * type MenuData = { loggedIn: boolean };   // ✓ accepted
  * ```
- *
- * (`Record<PropertyKey, unknown> | object` is equivalent to `object`; spelled out to
- * document that the interface-accepting arm is deliberate, not an oversight.)
  */
-export type AnyData = Record<PropertyKey, unknown> | object;
+export type AnyData = object;
 
 /** gramio contexts the dialog engine listens on. */
 export type CallbackCtx = ContextType<Bot, "callback_query">;
