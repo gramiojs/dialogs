@@ -208,9 +208,9 @@ describe("dialogs() plugin (real bot via @gramio/test)", () => {
 
 		await local.createUser({ first_name: "Eve" }).sendCommand("start");
 
-		expect(errors.some((m) => m.includes("64") && m.includes("callback_data"))).toBe(
-			true,
-		);
+		expect(
+			errors.some((m) => m.includes("64") && m.includes("callback_data")),
+		).toBe(true);
 	});
 });
 
@@ -218,7 +218,10 @@ describe("createDialogs().background (real bot via @gramio/test)", () => {
 	// D2-1: edit a user's dialog message from OUTSIDE an update (timer/webhook/worker).
 	it("edits the last rendered message without an incoming update", async () => {
 		const menu = new Dialog("menu")
-			.window("main", { text: "main", keyboard: Column([SwitchTo("go", "two")]) })
+			.window("main", {
+				text: "main",
+				keyboard: Column([SwitchTo("go", "two")]),
+			})
 			.window("two", { text: "second screen" });
 		const { plugin, background } = createDialogs([menu]);
 		const bot = new Bot("123:test")
@@ -233,6 +236,8 @@ describe("createDialogs().background (real bot via @gramio/test)", () => {
 		const manager = await background(bot, key);
 		await manager.switchTo("two");
 
-		expect(env.lastApiCall("editMessageText")?.params?.text).toBe("second screen");
+		expect(env.lastApiCall("editMessageText")?.params?.text).toBe(
+			"second screen",
+		);
 	});
 });
