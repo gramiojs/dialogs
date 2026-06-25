@@ -72,6 +72,40 @@ describe("link buttons (Url/WebApp)", () => {
 		expect(raw?.iconEmojiId).toBe("555");
 		expect(raw?.style).toBe("primary");
 	});
+
+	it("Button style accepts a function resolved from render data", async () => {
+		const b = Button({
+			text: Const("x"),
+			id: "b",
+			style: (rc) => (rc.data.ok ? "success" : "danger"),
+		});
+		const r1 = (await b.renderKeyboard(rc({ ok: true })))[0]?.[0];
+		expect(r1?.style).toBe("success");
+		const r2 = (await b.renderKeyboard(rc({ ok: false })))[0]?.[0];
+		expect(r2?.style).toBe("danger");
+	});
+
+	it("Button style function can return undefined", async () => {
+		const b = Button({
+			text: Const("x"),
+			id: "b",
+			style: () => undefined,
+		});
+		const raw = (await b.renderKeyboard(rc({})))[0]?.[0];
+		expect(raw?.style).toBeUndefined();
+	});
+
+	it("Url style accepts a function", async () => {
+		const w = Url({
+			text: Const("g"),
+			url: "https://x",
+			style: (rc) => (rc.data.n > 0 ? "primary" : undefined),
+		});
+		const r1 = (await w.renderKeyboard(rc({ n: 1 })))[0]?.[0];
+		expect(r1?.style).toBe("primary");
+		const r2 = (await w.renderKeyboard(rc({ n: 0 })))[0]?.[0];
+		expect(r2?.style).toBeUndefined();
+	});
 });
 
 describe("managed widget accessors (manager.counter/checkbox/radio/multiselect)", () => {

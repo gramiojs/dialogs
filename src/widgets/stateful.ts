@@ -57,6 +57,12 @@ export interface CounterOptions {
 	/** Wrap around min/max instead of clamping. */
 	cyclic?: boolean;
 	onChanged?: (ctx: ClickCtx, value: number) => MaybePromise<unknown>;
+	/**
+	 * Tap on the middle (value) button. Inert by default — the value is a display,
+	 * not a control. Wire this to give it an action (reset, prompt for input, …);
+	 * re-render in the handler if it mutates state.
+	 */
+	onValueTap?: (ctx: ClickCtx, value: number) => MaybePromise<unknown>;
 	when?: WhenCondition;
 }
 
@@ -72,6 +78,7 @@ class CounterWidget extends KeyboardWidget {
 		plusText: TextWidget;
 		minusText: TextWidget;
 		onChanged?: CounterOptions["onChanged"];
+		onValueTap?: CounterOptions["onValueTap"];
 	};
 	// (text sources normalised to TextWidget in the constructor)
 
@@ -88,6 +95,7 @@ class CounterWidget extends KeyboardWidget {
 			plusText: asText(options.plusText ?? "➕"),
 			minusText: asText(options.minusText ?? "➖"),
 			onChanged: options.onChanged,
+			onValueTap: options.onValueTap,
 		};
 	}
 
@@ -121,7 +129,11 @@ class CounterWidget extends KeyboardWidget {
 		manager: DialogManager,
 	): Promise<boolean> {
 		if (widgetId !== this.o.id) return false;
-		if (payload !== "+" && payload !== "-") return true; // value tap: no-op for now
+		if (payload !== "+" && payload !== "-") {
+			// value tap (payload "="): inert unless an onValueTap hook is wired.
+			await this.o.onValueTap?.(manager.clickCtx, this.value(manager));
+			return true;
+		}
 
 		let value =
 			this.value(manager) + (payload === "+" ? this.o.step : -this.o.step);

@@ -178,6 +178,36 @@ describe("Counter – value-tap (= payload) is a no-op", () => {
 	});
 });
 
+describe("Counter – onValueTap hook", () => {
+	it("fires on a value-tap with the current value", async () => {
+		const seen: number[] = [];
+		const dlg = new Dialog({
+			id: "ctr5",
+			windows: [
+				new Window({
+					state: "m",
+					text: Const("x"),
+					keyboard: Counter({
+						id: "c",
+						default: 5,
+						onValueTap: (_ctx, value) => {
+							seen.push(value);
+						},
+					}),
+				}),
+			],
+		});
+		const h = createHarness([dlg]);
+		await h.reset();
+		await (await h.managerFor(h.makeCtx("message"))).start("ctr5");
+
+		await h.click("c", "+"); // 5 → 6
+		await h.click("c", "="); // value tap → hook sees current value
+
+		expect(seen).toEqual([6]);
+	});
+});
+
 // ────────────────────────────────────────────────────────────────────────────
 // Slider edge cases
 // ────────────────────────────────────────────────────────────────────────────

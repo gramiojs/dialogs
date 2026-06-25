@@ -23,16 +23,26 @@ export type OnClick = (ctx: ClickCtx) => MaybePromise<unknown>;
 export interface ButtonChrome {
 	/** `custom_emoji_id` shown as the button icon (e.g. `iconId("search")`). */
 	icon?: string;
-	/** Button color: `"danger"` | `"success"` | `"primary"`. */
-	style?: ButtonStyle;
+	/**
+	 * Button color: `"danger"` | `"success"` | `"primary"`.
+	 * Accepts a static value or a function computed from render data.
+	 */
+	style?: ButtonStyle | ((rc: RenderContext) => ButtonStyle);
 	when?: WhenCondition;
 }
 
 interface Chrome {
 	icon?: string;
-	style?: ButtonStyle;
+	style?: ButtonStyle | ((rc: RenderContext) => ButtonStyle);
 }
 const chrome = (o: ButtonChrome): Chrome => ({ icon: o.icon, style: o.style });
+
+function resolveStyle(
+	style: ButtonStyle | ((rc: RenderContext) => ButtonStyle) | undefined,
+	rc: RenderContext,
+): ButtonStyle | undefined {
+	return typeof style === "function" ? style(rc) : style;
+}
 
 /** A `TextSource` (label), or a full options object — used to support positional + options call forms. */
 function isLabel(value: unknown): value is TextSource {
@@ -73,7 +83,7 @@ class ButtonWidget extends KeyboardWidget {
 					text: String(await this.text.renderText(rc)),
 					cb: { widgetId: this.id },
 					iconEmojiId: this.extra.icon,
-					style: this.extra.style,
+					style: resolveStyle(this.extra.style, rc),
 				},
 			],
 		];
@@ -295,7 +305,7 @@ class LinkWidget extends KeyboardWidget {
 		const base = {
 			text,
 			iconEmojiId: this.extra.icon,
-			style: this.extra.style,
+			style: resolveStyle(this.extra.style, rc),
 		};
 		return [
 			[
@@ -382,7 +392,7 @@ class SwitchInlineWidget extends KeyboardWidget {
 					text: String(await this.text.renderText(rc)),
 					switchInline: { query, currentChat: this.currentChat },
 					iconEmojiId: this.extra.icon,
-					style: this.extra.style,
+					style: resolveStyle(this.extra.style, rc),
 				},
 			],
 		];
