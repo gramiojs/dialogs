@@ -89,7 +89,7 @@ describe("link buttons (Url/WebApp)", () => {
 		const b = Button({
 			text: Const("x"),
 			id: "b",
-			style: () => undefined,
+			style: (_rc) => undefined,
 		});
 		const raw = (await b.renderKeyboard(rc({})))[0]?.[0];
 		expect(raw?.style).toBeUndefined();
@@ -99,7 +99,7 @@ describe("link buttons (Url/WebApp)", () => {
 		const w = Url({
 			text: Const("g"),
 			url: "https://x",
-			style: (rc) => (rc.data.n > 0 ? "primary" : undefined),
+			style: (rc) => ((rc.data as { n: number }).n > 0 ? "primary" : undefined),
 		});
 		const r1 = (await w.renderKeyboard(rc({ n: 1 })))[0]?.[0];
 		expect(r1?.style).toBe("primary");

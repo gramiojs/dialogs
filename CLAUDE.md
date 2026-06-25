@@ -33,9 +33,9 @@ handles message send/edit/delete, callback routing, and stack navigation.
 - **Telegram limits:** inline `callback_data` ≤ 64 bytes — use short item ids
   (list indices), never long strings, as widget payloads.
 
-## Before finishing
+## Before finishing (or pushing)
 
-Run `bun run typecheck && bun test && bun run build` — all must be green.
+Run `bun run check` (= `biome check src tests examples && tsc -p tsconfig.build.json && tsc && bun test && pkgroll`) — all must be green.
 
 The interactive demo bots live OUTSIDE this repo (moved to keep the package
 clean). See README "Examples".

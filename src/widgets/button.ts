@@ -27,18 +27,21 @@ export interface ButtonChrome {
 	 * Button color: `"danger"` | `"success"` | `"primary"`.
 	 * Accepts a static value or a function computed from render data.
 	 */
-	style?: ButtonStyle | ((rc: RenderContext) => ButtonStyle);
+	style?: ButtonStyle | ((rc: RenderContext) => ButtonStyle | undefined);
 	when?: WhenCondition;
 }
 
 interface Chrome {
 	icon?: string;
-	style?: ButtonStyle | ((rc: RenderContext) => ButtonStyle);
+	style?: ButtonStyle | ((rc: RenderContext) => ButtonStyle | undefined);
 }
 const chrome = (o: ButtonChrome): Chrome => ({ icon: o.icon, style: o.style });
 
 function resolveStyle(
-	style: ButtonStyle | ((rc: RenderContext) => ButtonStyle) | undefined,
+	style:
+		| ButtonStyle
+		| ((rc: RenderContext) => ButtonStyle | undefined)
+		| undefined,
 	rc: RenderContext,
 ): ButtonStyle | undefined {
 	return typeof style === "function" ? style(rc) : style;
