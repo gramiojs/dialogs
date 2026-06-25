@@ -1,6 +1,6 @@
 {
   "name": "@gramio/dialogs",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Declarative, stateful dialogs and reusable widgets for GramIO — inspired by aiogram_dialog.",
   "type": "module",
   "sideEffects": false,
